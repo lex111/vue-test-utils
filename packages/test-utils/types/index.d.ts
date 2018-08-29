@@ -56,8 +56,11 @@ interface BaseWrapper {
   visible (): boolean
 
   attributes(): { [name: string]: string }
+  attributes(key: string): string | void
   classes(): Array<string>
+  classes(className: string): boolean
   props(): { [name: string]: any }
+  props(key: string): any | void
 
   hasAttribute (attribute: string, value: string): boolean
   hasClass (className: string): boolean
@@ -104,7 +107,8 @@ export interface Wrapper<V extends Vue | null> extends BaseWrapper {
   text (): string
   name (): string
 
-  emitted (event?: string): { [name: string]: Array<Array<any>> }
+  emitted (): { [name: string]: Array<Array<any>> }
+  emitted (event: string): Array<any>
   emittedByOrder (): Array<{ name: string, args: Array<any> }>
 }
 

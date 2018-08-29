@@ -51,7 +51,7 @@ describeWithShallowAndMount('find', mountingMethod => {
   )
 
   it('returns Wrapper matching class selector passed if they are declared inside a functional component', () => {
-    const Component = {
+    const TestComponent = {
       functional: true,
       render (h, { props }) {
         return h('div', {}, [
@@ -68,7 +68,7 @@ describeWithShallowAndMount('find', mountingMethod => {
     const context = {
       data: { hello: true }
     }
-    const wrapper = mountingMethod(Component, {
+    const wrapper = mountingMethod(TestComponent, {
       context
     })
     expect(wrapper.find('.foo').vnode).to.be.an('object')
@@ -83,14 +83,16 @@ describeWithShallowAndMount('find', mountingMethod => {
   it('returns matching extended component', () => {
     const ChildComponent = Vue.extend({
       template: '<div />',
-      props: ['propA']
+      props: ['propA'],
+      name: 'child-component'
     })
     const TestComponent = {
       template: '<child-component propA="hey" />',
       components: { ChildComponent }
     }
     const wrapper = mountingMethod(TestComponent)
-    expect(wrapper.find(ChildComponent).vnode).to.be.an('object')
+
+    expect(wrapper.find(ChildComponent).name()).to.equal('child-component')
   })
 
   it('returns Wrapper of elements matching attribute selector passed', () => {
@@ -146,10 +148,35 @@ describeWithShallowAndMount('find', mountingMethod => {
         ComponentAsAClass
       }
     }
-
     const wrapper = mountingMethod(TestComponent)
+
     expect(wrapper.find(ComponentAsAClass).vnode).to.be.an('object')
   })
+
+  itDoNotRunIf(
+    mountingMethod.name === 'shallowMount',
+    'follows DOM tree order', () => {
+      const TestComponent = {
+        template: `
+      <main>
+        <div class="1">
+          <div class="1a"><div class="1aa"/></div><div class="1b" />
+        </div>
+        <component-2 />
+        <div class="3" />
+      </main>
+      `,
+        components: {
+          'component-2': {
+            template: '<div class="2" />'
+          }
+        }
+      }
+      const wrapper = mountingMethod(TestComponent)
+      const wrappers = wrapper.findAll('div').wrappers
+      const expectedClasses = ['1', '1a', '1aa', '1b', '2', '3']
+      wrappers.forEach((w, i) => expect(w.classes()).to.contain(expectedClasses[i]))
+    })
 
   it('returns Wrapper of Vue Component matching functional component', () => {
     if (!functionalSFCsSupported) {
@@ -167,6 +194,7 @@ describeWithShallowAndMount('find', mountingMethod => {
     }
 
     const wrapper = mountingMethod(TestComponent)
+
     expect(wrapper.find(FunctionalComponent).vnode).to.be.an('object')
     expect(wrapper.find(FunctionalComponent).vm).to.equal(undefined)
   })
@@ -316,6 +344,22 @@ describeWithShallowAndMount('find', mountingMethod => {
     expect(wrapper.find({ ref: 'foo' })).to.be.an('object')
   })
 
+  itSkipIf(vueVersion < 2.3,
+    'returns functional extended component', () => {
+      const FunctionalExtendedComponent = Vue.extend({
+        functional: true,
+        render: h => h('div')
+      })
+      const TestComponent = {
+        template: '<div><functional-extended-component /></div>',
+        components: {
+          FunctionalExtendedComponent
+        }
+      }
+      const wrapper = mountingMethod(TestComponent)
+      expect(wrapper.find(FunctionalExtendedComponent).exists()).to.equal(true)
+    })
+
   it('returns Wrapper of Vue Component matching the extended component', () => {
     const BaseComponent = {
       template: '<div><a-component /></div>',
@@ -330,6 +374,20 @@ describeWithShallowAndMount('find', mountingMethod => {
     const wrapper = mountingMethod(TestComponent)
     expect(wrapper.find(TestComponent).exists()).to.equal(true)
     expect(wrapper.find(TestComponent).isVueInstance()).to.equal(true)
+  })
+
+  it('works for extended child components', () => {
+    const ChildComponent = Vue.extend({
+      template: '<div />'
+    })
+    const TestComponent = {
+      template: '<child-component />',
+      components: {
+        ChildComponent
+      }
+    }
+    const wrapper = mountingMethod(TestComponent)
+    expect(wrapper.find(ChildComponent).exists()).to.equal(true)
   })
 
   it('returns a Wrapper matching a component name in options object', () => {

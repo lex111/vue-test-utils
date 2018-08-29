@@ -5,7 +5,10 @@ import addMocks from './add-mocks'
 import { addEventLogger } from './log-events'
 import { addStubs } from './add-stubs'
 import { throwError, vueVersion } from 'shared/util'
-import { compileTemplate } from 'shared/compile-template'
+import {
+  compileTemplate,
+  compileTemplateForSlots
+} from 'shared/compile-template'
 import { isRequiredComponent } from 'shared/validators'
 import extractInstanceOptions from './extract-instance-options'
 import createFunctionalComponent from './create-functional-component'
@@ -13,17 +16,6 @@ import { componentNeedsCompiling, isPlainObject } from 'shared/validators'
 import { validateSlots } from './validate-slots'
 import createScopedSlots from './create-scoped-slots'
 import { extendExtendedComponents } from './extend-extended-components'
-
-function compileTemplateForSlots (slots: Object): void {
-  Object.keys(slots).forEach(key => {
-    const slot = Array.isArray(slots[key]) ? slots[key] : [slots[key]]
-    slot.forEach(slotValue => {
-      if (componentNeedsCompiling(slotValue)) {
-        compileTemplate(slotValue)
-      }
-    })
-  })
-}
 
 function vueExtendUnsupportedOption (option: string) {
   return `options.${option} is not supported for ` +
@@ -44,11 +36,13 @@ const UNSUPPORTED_VERSION_OPTIONS = [
 export default function createInstance (
   component: Component,
   options: Options,
-  _Vue: Component,
-  elm?: Element
+  _Vue: Component
 ): Component {
   // Remove cached constructor
   delete component._Ctor
+
+  // make sure all extends are based on this instance
+  _Vue.options._base = _Vue
 
   if (
     vueVersion < 2.3 &&
@@ -77,7 +71,8 @@ export default function createInstance (
     component = createFunctionalComponent(component, options)
   } else if (options.context) {
     throwError(
-      `mount.context can only be used when mounting a ` + `functional component`
+      `mount.context can only be used when mounting a ` +
+      `functional component`
     )
   }
 
@@ -86,13 +81,15 @@ export default function createInstance (
   }
 
   // Replace globally registered components with components extended
-  // from localVue. This makes sure the beforeMount mixins to add stubs
-  // is applied to globally registered components.
+  // from localVue.
   // Vue version must be 2.3 or greater, because of a bug resolving
   // extended constructor options (https://github.com/vuejs/vue/issues/4976)
   if (vueVersion > 2.2) {
     for (const c in _Vue.options.components) {
       if (!isRequiredComponent(c)) {
+        const extendedComponent = _Vue.extend(_Vue.options.components[c])
+        extendedComponent.options.$_vueTestUtils_original =
+          _Vue.options.components[c]
         _Vue.component(c, _Vue.extend(_Vue.options.components[c]))
       }
     }
@@ -118,8 +115,13 @@ export default function createInstance (
   // Keep reference to component mount was called with
   Constructor._vueTestUtilsRoot = component
 
+  // used to identify extended component using constructor
+  Constructor.options.$_vueTestUtils_original = component
   if (options.slots) {
     compileTemplateForSlots(options.slots)
+    // validate slots outside of the createSlots function so
+    // that we can throw an error without it being caught by
+    // the Vue error handler
     // $FlowIgnore
     validateSlots(options.slots)
   }

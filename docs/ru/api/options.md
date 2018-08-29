@@ -206,7 +206,7 @@ expect(wrapper.vm.$route).toBeInstanceOf(Object)
  
 Пример:
 
- ```js
+```js
 const Component = {
   template: '<div>{{ msg }}</div>',
   props: ['msg']
@@ -221,7 +221,7 @@ expect(wrapper.text()).toBe('aBC')
 
 ::: tip 
 Стоит отметить, что `propsData` относятся на самом деле к [API Vue](https://ru.vuejs.org/v2/api/#propsData),
-а не к `vue-test-utils`. Он обрабатывается через [`extends`](#other-options).
+а не к `vue-test-utils`. Он обрабатывается через [`extends`](#другие-опции).
 ::: 
 
 ## listeners
@@ -252,6 +252,25 @@ expect(wrapper.vm.$parent.name).toBe('foo')
 - Тип: `Object`
 
 Передаёт свойства в компоненты для использования в инъекциях. См. [provide/inject](https://ru.vuejs.org/v2/api/#provide-inject).
+
+Пример:
+
+```js
+const Component = {
+  inject: ['foo'],
+  template: '<div>{{this.foo()}}</div>'
+}
+
+const wrapper = shallowMount(Component, {
+  provide: {
+    foo () {
+      return 'fooValue'
+    }
+  }
+})
+
+expect(wrapper.text()).toBe('fooValue')
+```
 
 ## sync
 

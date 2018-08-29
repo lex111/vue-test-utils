@@ -211,7 +211,7 @@ Set the component instance's `$attrs` object.
 
 - type: `Object`
 
-Set the component instance's props. 
+Set the component instance's props when the component is mounted.
 
 Example:
 
@@ -230,7 +230,8 @@ expect(wrapper.text()).toBe('aBC')
 
 ::: tip 
 It's worth noting that `propsData` is actually a [Vue API](https://vuejs.org/v2/api/#propsData), not a 
-`vue-test-utils` option. It is processed through [`extends`](#other-options).
+Vue Test Utils mounting option. It is processed through [`extends`](https://vuejs.org/v2/api/#extends).
+Please see [Other options](#other-options).
 ::: 
 
 ## listeners
@@ -261,6 +262,25 @@ expect(wrapper.vm.$parent.name).toBe('foo')
 - type: `Object`
 
 Pass properties for components to use in injection. See [provide/inject](https://vuejs.org/v2/api/#provide-inject).
+
+Example:
+
+```js
+const Component = {
+  inject: ['foo'],
+  template: '<div>{{this.foo()}}</div>'
+}
+
+const wrapper = shallowMount(Component, {
+  provide: {
+    foo () {
+      return 'fooValue'
+    }
+  }
+})
+
+expect(wrapper.text()).toBe('fooValue')
+```
 
 ## sync
 

@@ -1,4 +1,4 @@
-## Testing Single File Components with Jest
+## Testing Single-File Components with Jest
 
 > An example project for this setup is available on [GitHub](https://github.com/vuejs/vue-test-utils-jest-example).
 
@@ -25,7 +25,7 @@ Next we need to define a unit script in our `package.json`.
 }
 ```
 
-### Processing SFCs in Jest
+### Processing Single-File Components in Jest
 
 To teach Jest how to process `*.vue` files, we will need to install and configure the `vue-jest` preprocessor:
 

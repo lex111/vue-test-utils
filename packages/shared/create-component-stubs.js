@@ -1,7 +1,6 @@
 // @flow
 
 import Vue from 'vue'
-import { compileToFunctions } from 'vue-template-compiler'
 import {
   throwError,
   camelize,
@@ -11,21 +10,12 @@ import {
 import {
   componentNeedsCompiling,
   templateContainsComponent,
-  isVueComponent,
-  isRequiredComponent
+  isVueComponent
 } from './validators'
-import { compileTemplate } from './compile-template'
-
-function compileFromString (str) {
-  if (!compileToFunctions) {
-    throwError(
-      `vueTemplateCompiler is undefined, you must pass ` +
-        `precompiled components if vue-template-compiler is ` +
-        `undefined`
-    )
-  }
-  return compileToFunctions(str)
-}
+import {
+  compileTemplate,
+  compileFromString
+} from './compile-template'
 
 function isVueComponentStub (comp): boolean {
   return comp && comp.template || isVueComponent(comp)
@@ -33,8 +23,8 @@ function isVueComponentStub (comp): boolean {
 
 function isValidStub (stub: any): boolean {
   return (
+    typeof stub === 'boolean' ||
     (!!stub && typeof stub === 'string') ||
-    stub === true ||
     isVueComponentStub(stub)
   )
 }
@@ -67,9 +57,54 @@ function getCoreProperties (componentOptions: Component): Object {
   }
 }
 
+function createClassString (staticClass, dynamicClass) {
+  if (staticClass && dynamicClass) {
+    return staticClass + ' ' + dynamicClass
+  }
+  return staticClass || dynamicClass
+}
+
+export function createStubFromComponent (
+  originalComponent: Component,
+  name: string
+): Component {
+  const componentOptions = typeof originalComponent === 'function'
+    ? originalComponent.extendOptions
+    : originalComponent
+  const tagName = `${name}-stub`
+
+  // ignoreElements does not exist in Vue 2.0.x
+  if (Vue.config.ignoredElements) {
+    Vue.config.ignoredElements.push(tagName)
+  }
+
+  return {
+    ...getCoreProperties(componentOptions),
+    $_vueTestUtils_original: originalComponent,
+    render (h, context) {
+      return h(
+        tagName,
+        {
+          attrs: componentOptions.functional ? {
+            ...context.props,
+            ...context.data.attrs,
+            class: createClassString(
+              context.data.staticClass,
+              context.data.class
+            )
+          } : {
+            ...this.$props
+          }
+        },
+        context ? context.children : this.$options._renderChildren
+      )
+    }
+  }
+}
+
 function createStubFromString (
   templateString: string,
-  originalComponent: Component,
+  originalComponent: Component = {},
   name: string
 ): Component {
   if (templateContainsComponent(templateString, name)) {
@@ -86,145 +121,104 @@ function createStubFromString (
   }
 }
 
-function createClassString (staticClass, dynamicClass) {
-  if (staticClass && dynamicClass) {
-    return staticClass + ' ' + dynamicClass
-  }
-  return staticClass || dynamicClass
-}
-
-export function createBlankStub (
-  originalComponent: Component,
-  name: string
-): Component {
-  const componentOptions = typeof originalComponent === 'function'
-    ? originalComponent.extendOptions
-    : originalComponent
-  const tagName = `${name}-stub`
-
-  // ignoreElements does not exist in Vue 2.0.x
-  if (Vue.config.ignoredElements) {
-    Vue.config.ignoredElements.push(tagName)
-  }
-
-  return {
-    ...getCoreProperties(componentOptions),
-    render (h, context) {
-      return h(
-        tagName,
-        {
-          attrs: componentOptions.functional ? {
-            ...context.props,
-            ...context.data.attrs,
-            class: createClassString(
-              context.data.staticClass,
-              context.data.class
-            )
-          } : {
-            ...this.$props
-          }
-        },
-        context ? context.children : this.$slots.default
-      )
-    }
+function validateStub (stub) {
+  if (!isValidStub(stub)) {
+    throwError(
+      `options.stub values must be passed a string or ` +
+      `component`
+    )
   }
 }
 
-export function createComponentStubs (
+export function createStubsFromStubsObject (
   originalComponents: Object = {},
   stubs: Object
 ): Components {
-  const components = {}
-  if (!stubs) {
-    return components
-  }
-  Object.keys(stubs).forEach(stubName => {
+  return Object.keys(stubs || {}).reduce((acc, stubName) => {
     const stub = stubs[stubName]
-    if (stub === false) {
-      return
-    }
 
-    if (!isValidStub(stub)) {
-      throwError(
-        `options.stub values must be passed a string or ` + `component`
-      )
+    validateStub(stub)
+
+    if (stub === false) {
+      return acc
     }
 
     if (stub === true) {
       const component = resolveComponent(originalComponents, stubName)
-      components[stubName] = createBlankStub(component, stubName)
-      return
-    }
-
-    if (typeof stub !== 'string' && componentNeedsCompiling(stub)) {
-      compileTemplate(stub)
+      acc[stubName] = createStubFromComponent(component, stubName)
+      return acc
     }
 
     if (originalComponents[stubName]) {
       // Remove cached constructor
       delete originalComponents[stubName]._Ctor
-      if (typeof stub === 'string') {
-        components[stubName] = createStubFromString(
-          stub,
-          originalComponents[stubName],
-          stubName
-        )
-      } else {
-        const stubObject = (stub: Object)
-        components[stubName] = {
-          ...stubObject,
-          name: originalComponents[stubName].name
-        }
-      }
-    } else {
-      if (typeof stub === 'string') {
-        components[stubName] = {
-          ...compileFromString(stub)
-        }
-      } else {
-        const stubObject = (stub: Object)
-        components[stubName] = {
-          ...stubObject
-        }
-      }
     }
-  })
-  return components
+
+    if (typeof stub === 'string') {
+      acc[stubName] = createStubFromString(
+        stub,
+        originalComponents[stubName],
+        stubName
+      )
+      return acc
+    }
+
+    if (componentNeedsCompiling(stub)) {
+      compileTemplate(stub)
+    }
+    const name = originalComponents[stubName] &&
+    originalComponents[stubName].name
+
+    acc[stubName] = {
+      name,
+      ...stub
+    }
+
+    return acc
+  }, {})
 }
 
 function stubComponents (
   components: Components,
   stubbedComponents: Components
 ): void {
-  Object.keys(components).forEach(component => {
+  for (const component in components) {
     const cmp = components[component]
     const componentOptions = typeof cmp === 'function'
       ? cmp.extendOptions
       : cmp
 
     if (!componentOptions) {
-      stubbedComponents[component] = createBlankStub({}, component)
+      stubbedComponents[component] = createStubFromComponent(
+        {},
+        component
+      )
       return
     }
     // Remove cached constructor
     delete componentOptions._Ctor
-    if (!componentOptions.name) {
-      componentOptions.name = component
-    }
-    stubbedComponents[component] = createBlankStub(componentOptions, component)
-  })
+
+    stubbedComponents[component] = createStubFromComponent(
+      cmp,
+      component
+    )
+  }
 }
 
-export function createComponentStubsForAll (component: Component): Components {
+export function createStubsForComponent (
+  component: Component
+): Components {
   const stubbedComponents = {}
+
+  if (component.options) {
+    stubComponents(component.options.components, stubbedComponents)
+  }
 
   if (component.components) {
     stubComponents(component.components, stubbedComponents)
   }
 
   let extended = component.extends
-
-  // Loop through extended component chains to stub all child components
   while (extended) {
     if (extended.components) {
       stubComponents(extended.components, stubbedComponents)
@@ -241,19 +235,4 @@ export function createComponentStubsForAll (component: Component): Components {
   }
 
   return stubbedComponents
-}
-
-export function createComponentStubsForGlobals (
-  instance: Component
-): Components {
-  const components = {}
-  for (const c in instance.options.components) {
-    if (isRequiredComponent(c)) {
-      continue
-    }
-    components[c] = createBlankStub(instance.options.components[c], c)
-    delete instance.options.components[c]._Ctor
-    delete components[c]._Ctor
-  }
-  return components
 }

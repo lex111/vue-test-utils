@@ -1,4 +1,5 @@
 import { warn } from 'shared/util'
+import { addHook } from './add-hook'
 
 function createdFrom (extendOptions, componentOptions) {
   while (extendOptions) {
@@ -75,7 +76,11 @@ export function extendExtendedComponents (
           `config.logModifiedComponents option to false.`
         )
       }
-      extendedComponents[c] = _Vue.extend(comp)
+
+      const extendedComp = _Vue.extend(comp)
+      // Used to identify component in a render tree
+      extendedComp.options.$_vueTestUtils_original = comp
+      extendedComponents[c] = extendedComp
     }
     // If a component has been replaced with an extended component
     // all its child components must also be replaced.
@@ -87,15 +92,13 @@ export function extendExtendedComponents (
       shouldExtendComponent
     )
   })
-  if (extendedComponents) {
-    _Vue.mixin({
-      created () {
-        if (createdFrom(this.constructor, component)) {
-          Object.assign(
-            this.$options.components,
-            extendedComponents
-          )
-        }
+  if (Object.keys(extendedComponents).length > 0) {
+    addHook(_Vue.options, 'beforeCreate', function addExtendedOverwrites () {
+      if (createdFrom(this.constructor, component)) {
+        Object.assign(
+          this.$options.components,
+          extendedComponents
+        )
       }
     })
   }

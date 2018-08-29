@@ -19,6 +19,7 @@ bool = wrapper.hasClass('foo-class')
 bool = wrapper.hasProp('checked', true)
 bool = wrapper.props().checked
 bool = wrapper.hasStyle('color', 'red')
+bool = wrapper.classes('foo')
 
 bool = wrapper.is(normalOptions)
 bool = wrapper.isEmpty()
@@ -26,8 +27,8 @@ bool = wrapper.isVueInstance()
 
 wrapper.vm.$emit('hello')
 
-const emitted = wrapper.emitted()
-const arr: Array<any> = emitted.hello
+let n: number = wrapper.emitted().hello[0][0]
+let o: string = wrapper.emitted('hello')[0]
 
 const emittedByOrder = wrapper.emittedByOrder()
 const name: string = emittedByOrder[0].name
@@ -66,10 +67,12 @@ wrapper.setChecked()
 wrapper.setChecked(true)
 wrapper.setValue('some string')
 wrapper.setSelected()
+wrapper.props('foo')
 
 let str: string = wrapper.html()
 str = wrapper.text()
 str = wrapper.name()
+wrapper.attributes('foo')
 
 /**
  * Tests for WrapperArray API

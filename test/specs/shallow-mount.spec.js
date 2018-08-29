@@ -77,6 +77,25 @@ describeRunIf(process.env.TEST_ENV !== 'node', 'shallowMount', () => {
     expect(wrapper.html()).to.equal('<child-stub>Hello</child-stub>')
   })
 
+  it('renders named slots', () => {
+    const localVue = createLocalVue()
+    localVue.component('child', {
+      template: '<div />'
+    })
+    const TestComponent = {
+      template: `
+        <child>
+          <p slot="header">Hello</p>
+          <p slot="footer">World</p>
+      </child>
+      `
+    }
+    const wrapper = shallowMount(TestComponent, {
+      localVue
+    })
+    expect(wrapper.html()).to.equal('<child-stub><p>Hello</p> <p>World</p></child-stub>')
+  })
+
   it('renders no children if none supplied', () => {
     const TestComponent = {
       template: '<child />',
@@ -344,16 +363,6 @@ describeRunIf(process.env.TEST_ENV !== 'node', 'shallowMount', () => {
       RecursiveComponent: { render: h => h('div') }
     }
 
-    expect(
-      shallowMount(RecursiveComponent, {
-        propsData: {
-          items: ['', '']
-        }
-      }).findAll(RecursiveComponent).length
-    ).to.equal(3)
-    RecursiveComponent.components = {
-      'recursive-component': { render: h => h('div') }
-    }
     expect(
       shallowMount(RecursiveComponent, {
         propsData: {
